@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+venv/
+.env/
+.envrc
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# OS 별 임시 파일
+.DS_Store
+Thumbs.db
+
+# Log / Cache / Output
+*.log
+*.tmp
+*.out
+*.bak
+
+# Data
+*.csv
+*.tsv
+*.h5
+*.npy
+*.npz
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+*.hdf5
+
+# Images
+*.jpg
+*.jpeg
+*.png
+*.gif
