@@ -1,0 +1,1 @@
+# Ai generated animal images detector
