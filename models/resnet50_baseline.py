@@ -4,10 +4,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
+from PIL import Image
 from tqdm import tqdm
 from dotenv import load_dotenv
 
-def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device):
+def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir):
+    save_path = os.path.join(save_dir, "resnet50.pth")
+
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -40,6 +43,9 @@ def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, dev
 
         validate(val_loader)
 
+    torch.save(model.state_dict(), save_path)
+    return save_path
+
 def validate(val_loader):
     model.eval()
     val_loss = 0.0
@@ -64,8 +70,29 @@ def validate(val_loader):
         val_epoch_acc = val_correct_preds / val_total_preds
         print(f"Validation Loss: {val_epoch_loss:.4f}, Validation Acc: {val_epoch_acc:.4f}\n")
 
+def load_model(model, path, device):
+    model.load_state_dict(torch.load(path))
+    model.to(device)
+    model.eval()
+    print(f"Model is loaded successfully!")
+    return model
+
+def predict(model, image_path, device, class_names, transform):
+    model.eval()
+    img = Image.open(image_path).convert('RGB')
+    img = transform(img).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        outputs = model(img)
+        probs = torch.softmax(outputs, dim=1)
+        conf, pred = torch.max(probs, 1)
+
+    print(f"Prediction: {class_names[pred.item()]} ({conf.item() * 100:.2f}%")
+    return class_names[pred.item()], conf.item()
+
 load_dotenv()
 data_dir = os.getenv("DATA_PATH")
+save_dir = os.getenv("SAVE_PATH")
 
 batch_size = 32
 num_epochs = 10
@@ -92,6 +119,8 @@ val_dataset = datasets.ImageFolder(os.path.join(data_dir, 'val'), transform=val_
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
+class_names = train_dataset.classes
+
 model = models.resnet50(pretrained=True)
 num_features = model.fc.in_features
 model.fc = nn.Linear(num_features, 2) # Binary classification
@@ -101,4 +130,12 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 
 if __name__ == "__main__":
-    train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device)
+    save_path = os.path.join(save_dir, "resnet50.pth")
+
+    if not os.path.exists(save_path):
+        save_path = train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir)
+
+    model = load_model(model, save_path, device)
+
+    test_img = os.path.join(data_dir, 'val', class_names[0], 'example_01.jpg') # img path must be changed
+    predict(model, test_img, device, class_names, val_transforms)
