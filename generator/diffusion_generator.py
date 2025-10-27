@@ -8,31 +8,38 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-device = "cpu" #"cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 base_dir = os.getenv("DATA_PATH")
 classes = ["elephant", "cat", "chicken", "cow", "dog", "horse", "rabbit", "sheep"]
-num_images_per_class = 100
+num_images_per_class = 1000
 size = (224, 224)
 split_ratios = {"train": 0.7, "val": 0.15, "test": 0.15}
 
 print("Loading Stable Diffusion models...")
 
-sd15 = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
+#sd15 = StableDiffusionPipeline.from_pretrained(
+#    "runwayml/stable-diffusion-v1-5",
+#    dtype=torch.float16,
+#    variant="fp16"
+#).to(device)
+
+#sdxl = StableDiffusionXLPipeline.from_pretrained(
+#    "stabilityai/stable-diffusion-xl-base-1.0",
+#    dtype=torch.float16
+#).to(device)
+
+turbo = StableDiffusionPipeline.from_pretrained(
+    "stabilityai/sd-turbo",
     dtype=torch.float16,
     variant="fp16"
-).to(device)
-
-sdxl = StableDiffusionXLPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-xl-base-1.0",
-    dtype=torch.float16
 ).to(device)
 
 print("Models loaded successfully.")
 
 generators = {
-    "stable_v15": sd15,
-    "sdxl": sdxl
+    #"stable_v15": sd15,
+    #"sdxl": sdxl,
+    "sd_turbo": turbo
 }
 
 temp_dir = os.path.join(base_dir, "temp_ai_images")
@@ -44,9 +51,9 @@ for generator_name, pipe in generators.items():
         os.makedirs(temp_save_dir, exist_ok=True)
         for i in tqdm(range(num_images_per_class), desc=f"{generator_name}-{cls}"):
             prompt = f"photo of a {cls}, high quality, natural lighting"
-            image = pipe(prompt, num_inference_steps=30).images[0]
+            image = pipe(prompt, num_inference_steps=4).images[0] #sd15 = 30 steps, sd turbo = 4 steps
             image = image.resize(size)
-            image.save(os.path.join(temp_save_dir, f"{cls}_{i:04d}.png"))
+            image.save(os.path.join(temp_save_dir, f"{cls}_{i+1000:04d}.png"))
 
 print("\nSplitting generated images into train, val, and test sets...")
 
