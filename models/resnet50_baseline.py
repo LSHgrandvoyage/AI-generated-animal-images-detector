@@ -7,15 +7,16 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from tqdm import tqdm
 from dotenv import load_dotenv
+from metrics import compute_metrics
 
 def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir):
     save_path = os.path.join(save_dir, "resnet50.pth")
+    best_val_f1 = 0.0
 
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        correct_preds = 0
-        total_preds = 0
+        all_labels, all_preds, all_probs = [], [], []
 
         print(f"Epoch {epoch + 1}/{num_epochs}")
         train_pbar = tqdm(train_loader, desc=f"Training", unit="batch")
@@ -30,45 +31,49 @@ def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, dev
 
             running_loss += loss.item() * inputs.size(0)
 
-            _, predicted = torch.max(outputs.data, 1)
-            total_preds += labels.size(0)
-            correct_preds += (predicted == labels).sum().item()
+            probs = torch.softmax(outputs, dim=1).detach().cpu().numpy()
+            preds = probs.argmax(axis=1)
+            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(preds)
+            all_probs.extend(probs)
 
             train_pbar.set_postfix({'loss': loss.item()})
 
 
         epoch_loss = running_loss / len(train_dataset)
-        epoch_acc = correct_preds / total_preds
-        print(f"Train Loss: {epoch_loss:.4f}, Train Acc: {epoch_acc:.4f}")
+        epoch_metrics = compute_metrics(all_labels, all_preds, all_probs)
+        print(f"Train Loss: {epoch_loss:.4f}, Train F1: {epoch_metrics['f1-score']:.4f}")
 
-        validate(val_loader)
+        val_loss, val_metrics = validate(model, val_loader, criterion, device)
+        print(f"Validation Loss: {val_loss:.4f}, Validation F1: {val_metrics['f1-score']:.4f}, Validation AUC: {val_metrics['roc-auc']:.4f}")
 
-    torch.save(model.state_dict(), save_path)
+    torch.save(model.state_dict(), save_path) #save 파일명 추후 변경
     return save_path
 
-def validate(val_loader):
+def validate(model, loader, criterion, device):
     model.eval()
-    val_loss = 0.0
-    val_correct_preds = 0
-    val_total_preds = 0
+    running_loss = 0.0
+    all_labels, all_preds, all_probs = [], [], []
 
     with torch.no_grad():
-        val_pbar = tqdm(val_loader, desc=f"Validation", unit="batch")
+        val_pbar = tqdm(loader, desc=f"Validation", unit="batch")
         for inputs, labels in val_pbar:
             inputs, labels = inputs.to(device), labels.to(device)
 
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
-            val_loss += loss.item() * inputs.size(0)
+            running_loss += loss.item() * inputs.size(0)
 
-            _, predicted = torch.max(outputs.data, 1)
-            val_total_preds += labels.size(0)
-            val_correct_preds += (predicted == labels).sum().item()
+            probs = torch.softmax(outputs, dim=1).cpu().numpy()
+            preds = probs.argmax(axis=1)
+            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(preds)
+            all_probs.extend(probs)
 
-        val_epoch_loss = val_loss / len(val_dataset)
-        val_epoch_acc = val_correct_preds / val_total_preds
-        print(f"Validation Loss: {val_epoch_loss:.4f}, Validation Acc: {val_epoch_acc:.4f}\n")
+        val_loss = running_loss / len(loader.dataset)
+        metrics = compute_metrics(all_labels, all_preds, all_probs)
+        return val_loss, metrics
 
 def load_model(model, path, device):
     model.load_state_dict(torch.load(path))
@@ -87,7 +92,7 @@ def predict(model, image_path, device, class_names, transform):
         probs = torch.softmax(outputs, dim=1)
         conf, pred = torch.max(probs, 1)
 
-    print(f"Prediction: {class_names[pred.item()]} ({conf.item() * 100:.2f}%")
+    print(f"Prediction: {class_names[pred.item()]} {conf.item() * 100:.2f}%")
     return class_names[pred.item()], conf.item()
 
 load_dotenv()
@@ -99,25 +104,20 @@ num_epochs = 10
 lr = 1e-4
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-train_transforms = transforms.Compose([
+transforms = transforms.Compose([
     transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406],
                          [0.229, 0.224, 0.225])
 ])
 
-val_transforms = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                        [0.229, 0.224, 0.225])
-])
+train_dataset = datasets.ImageFolder(os.path.join(data_dir, 'train'), transform=transforms)
+val_dataset = datasets.ImageFolder(os.path.join(data_dir, 'val'), transform=transforms)
+test_dataset = datasets.ImageFolder(os.path.join(data_dir, 'test'), transform=transforms)
 
-train_dataset = datasets.ImageFolder(os.path.join(data_dir, 'train'), transform=train_transforms)
-val_dataset = datasets.ImageFolder(os.path.join(data_dir, 'val'), transform=val_transforms)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 class_names = train_dataset.classes
 
@@ -137,5 +137,6 @@ if __name__ == "__main__":
 
     model = load_model(model, save_path, device)
 
-    test_img = os.path.join(data_dir, 'val', class_names[0], 'example_01.jpg') # img path must be changed
-    predict(model, test_img, device, class_names, val_transforms)
+    test_img = os.path.join(data_dir, 'singletest', class_names[0], 'testdog.jpg')
+    predict(model, test_img, device, class_names, transforms)
+
