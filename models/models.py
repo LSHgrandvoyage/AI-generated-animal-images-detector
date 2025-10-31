@@ -8,10 +8,26 @@ from PIL import Image
 from tqdm import tqdm
 from dotenv import load_dotenv
 from metrics import compute_metrics
+import timm
 
-def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir):
-    save_path = os.path.join(save_dir, "resnet50.pth")
-    best_val_f1 = 0.0
+def get_model(model_name, num_classes=2):
+    if model_name == 'resnet50':
+        model = models.resnet50(pretrained=True)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        return model
+
+    if model_name == 'efficientnet_b0':
+        model = models.efficientnet_b0(pretrained=True)
+        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
+        return model
+
+    if model_name == 'vit_base':
+        model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes=num_classes)
+        return model
+
+
+def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir, model_name):
+    save_path = os.path.join(save_dir, f"{model_name}.pth")
 
     for epoch in range(num_epochs):
         model.train()
@@ -79,7 +95,7 @@ def load_model(model, path, device):
     model.load_state_dict(torch.load(path))
     model.to(device)
     model.eval()
-    print(f"Model is loaded successfully!")
+    print(f"Model is loaded successfully! Model : {path}")
     return model
 
 def predict(model, image_path, device, class_names, transform):
@@ -98,6 +114,7 @@ def predict(model, image_path, device, class_names, transform):
 load_dotenv()
 data_dir = os.getenv("DATA_PATH")
 save_dir = os.getenv("SAVE_PATH")
+model_name = os.getenv("MODEL_NAME", 'resnet50')
 
 batch_size = 32
 num_epochs = 10
@@ -121,19 +138,15 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 class_names = train_dataset.classes
 
-model = models.resnet50(pretrained=True)
-num_features = model.fc.in_features
-model.fc = nn.Linear(num_features, 2) # Binary classification
-model = model.to(device)
-
+model = get_model(model_name, num_classes=2).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 
 if __name__ == "__main__":
-    save_path = os.path.join(save_dir, "resnet50.pth")
+    save_path = os.path.join(save_dir, f"{model_name}.pth")
 
     if not os.path.exists(save_path):
-        save_path = train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir)
+        save_path = train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_dir, model_name)
 
     model = load_model(model, save_path, device)
 
