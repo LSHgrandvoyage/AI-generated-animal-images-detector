@@ -15,7 +15,7 @@ num_images_per_class = 1000
 size = (224, 224)
 split_ratios = {"train": 0.7, "val": 0.15, "test": 0.15}
 
-print("Loading Stable Diffusion models...")
+print("Loading Stable Diffusion utils...")
 
 #sd15 = StableDiffusionPipeline.from_pretrained(
 #    "runwayml/stable-diffusion-v1-5",
