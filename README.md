@@ -11,14 +11,15 @@ ResNet50, EfficientNet-B0, ViT 모델을 기반으로 다양한 **Optimizer / Le
 AI-generated-animal-image-detector/
 │
 ├── train.py # main 실행 script
-├── data_loader.py # Dataset 및 DataLoader 정의
-├── model_builder.py # Model 및 Optimizer builder function 정의
-├── trainer.py # train, validate, test 및 model save logic
+├── data_loader.py # Dataset && DataLoader 정의
+├── model_builder.py # Model && Optimizer builder function 정의
+├── trainer.py # train, validate && model save logic
+├── evaluate.py # test && saved model 기반 metrics 실행 && result save
 ├── generator/
 │     └── diffusion_generator.py # AI 이미지 생성 script
 ├── utils/
 │     └── metrics.py # 성능 평가 지표 계산 함수
-└── results/ # 성능 평가 결과 및 model 저장
+└── results/ # 성능 평가 결과 및 model 저장 위치
 ```
 
 ```bash
@@ -74,16 +75,26 @@ python train.py
 ---
 
 ## Dataset
+- Data balanced
+
+### Real images
+- Kaggle에서 수집한 animal images
+- Elephant, cow, sheep, dog, cat, chicken, horse, rabbit으로 구성
+- 각 species 별로 2000장 (도합 16,000장)
+- train : test : val = 7 : 1.5 : 1.5 비율
+
+### AI images
+- sd_turbo(diffusion model)로 생성한 animal images
+- Elephant, cow, sheep, dog, cat, chicken, horse, rabbit으로 구성
+- 각 species 별로 2000장 (도합 16,000장)
+- train : test : val = 7 : 1.5 : 1.5 비율
 
 ---
 ## File explanation
 >train.py
 - 메인 실행 스크립트
 - 전체 실험 조합(Model × Optimizer × Hyperparameters)을 자동으로 탐색
-- 각 조합에 대해 모델 train → validate → test 수행
-- 최고 성능 모델을 저장하고, 모든 조합의 결과를 CSV로 기록
 - train_and_evaluate() 호출
-- 결과를 results.csv로 저장
 
 >data_loader.py
 - Dataset loading 및 preprocessing 정의
@@ -103,14 +114,18 @@ python train.py
 - 이름에 따라 Optimizer 생성
 
 >trainer.py
-- train, validate, test
+- train, validate
 - Model save
 - 한 조합에 대한 전체 train 수행
 - 각 epoch에서
   - Model train
   - Validation set 성능 평가
-  - 최고 성능 Model save
-- Test set에서 평가 후 결과 return
+  - Model save
+
+>evaluate.py
+- train 완료 model에 대한 metrics 계산 script
+- saved model을 불러와 test
+- 계산된 metrics를 results.csv로 저장
 
 >utils/dataset_reorganize_script.py
 - Dataset 정리 용도
