@@ -22,7 +22,7 @@ def train_and_save(model, optimizer, train_loader, val_loader, device, save_dir,
                 pbar.set_postfix(loss=f"{loss.item():.4f}")
 
         val_acc = evaluate_val_acc(model, val_loader, device)
-        tqdm.write(f"Epoch {epoch + 1}/{num_epochs} - Val Acc: {val_acc:.4f}")
+        tqdm.write(f"\nEpoch {epoch + 1}/{num_epochs} - Val Acc: {val_acc:.4f}")
 
     save_path = os.path.join(save_dir, f"{model_tag}.pth")
     torch.save(model.state_dict(), save_path)

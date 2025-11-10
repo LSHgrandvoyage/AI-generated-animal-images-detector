@@ -7,44 +7,37 @@ from data_loader import get_data_loader
 from model_builder import build_model
 from utils.metrics import compute_metrics
 
-def load_saved_models(model_dir, device):
-    models = []
-    for file in os.listdir(model_dir):
-        if file.endswith('.pth'):
-            model_path = os.path.join(model_dir, file)
-            model_name = file.split('_')[0]
-            model = build_model(model_name).to(device)
-            model.load_state_dict(torch.load(model_path, map_location=device))
-            model.eval()
-            models.append((file, model))
-    return models
+def load_saved_model(model_path, device):
+    model_fullname = model_path.split(os.sep)[-1]
+    model_name = model_fullname.split('_')[0]
+    if model_name != 'resnet50':
+        model_name += '_' + str(model_fullname.split('_')[1])
 
-def evaluate_models(models, test_loader, device):
-    results = []
-    for model_name, model in tqdm(models, desc="Evaluating saved models"):
-        y_true, y_pred, y_prob = [], [], []
+    model = build_model(model_name).to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
 
-        with torch.no_grad():
-            for images, labels in test_loader:
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
+    return model
 
-                probs = torch.softmax(outputs, dim=1)[:, 1]
-                preds = torch.argmax(outputs, dim=1)
+def evaluate_model(model, model_filename, test_loader, device):
+    y_true, y_pred, y_prob = [], [], []
 
-                y_true.extend(labels.cpu().numpy())
-                y_pred.extend(preds.cpu().numpy())
-                y_prob.extend(probs.cpu().numpy())
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
 
-        metrics = compute_metrics(y_true, y_pred, y_prob)
+            probs = torch.softmax(outputs, dim=1)[:, 1]
+            preds = torch.argmax(outputs, dim=1)
 
-        info = parse_model_tag(model_name)
-        results.append({
-            **info,
-            **metrics
-        })
+            y_true.extend(labels.cpu().numpy())
+            y_pred.extend(preds.cpu().numpy())
+            y_prob.extend(probs.cpu().numpy())
 
-    return results
+    metrics = compute_metrics(y_true, y_pred, y_prob)
+    info = parse_model_tag(model_filename)
+
+    return {**info, **metrics}
 
 def parse_model_tag(filename):
     base = os.path.splitext(filename)[0]
@@ -57,6 +50,11 @@ def parse_model_tag(filename):
         "batch": get_value(parts, "batch"),
         "num_epochs": get_value(parts, "epoch"),
     }
+
+    if parts[0] != 'resnet50':
+        info['model'] += parts[1]
+        info['optimizer'] = parts[2]
+
     return info
 
 def get_value(parts, key):
@@ -85,6 +83,14 @@ if __name__ == '__main__':
 
     _, _, test_loader = get_data_loader(data_dir, batch=32)
 
-    models = load_saved_models(save_dir, device)
-    result = evaluate_models(models, test_loader, device)
-    save_results(result, save_dir)
+    models = [f for f in os.listdir(save_dir) if f.endswith('.pth')]
+    results = []
+
+    for idx, file in enumerate(tqdm(models, desc="Evaluating models")):
+        model_path = os.path.join(save_dir, file)
+        model = load_saved_model(model_path, device)
+        results.append(evaluate_model(model, file, test_loader, device))
+        torch.cuda.empty_cache()
+        tqdm.write(f"[{idx + 1}/{len(models)}] Finished evaluating {file}")
+
+    save_results(results, save_dir)
