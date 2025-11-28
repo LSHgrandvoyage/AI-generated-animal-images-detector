@@ -4,38 +4,8 @@ import pandas as pd
 from dotenv import load_dotenv
 from tqdm import tqdm
 from data_loader import get_data_loader
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-from torchvision import transforms
-from PIL import Image
 from model_builder import build_model
 from utils.metrics import compute_metrics
-
-class GANImageDataset(Dataset):
-    def __init__(self, ai_dir, real_dir, transform=None):
-        self.transform = transform
-        self.files = []
-        self.labels = []
-        for f in os.listdir(ai_dir):
-            if f.endswith('.png'):
-                self.files.append(os.path.join(ai_dir, f))
-                self.labels.append(0)
-        for f in os.listdir(real_dir):
-            if f.endswith('.png'):
-                self.files.append(os.path.join(real_dir, f))
-                self.labels.append(1)
-
-    def __len__(self):
-        return len(self.files)
-
-    def __getitem__(self, idx):
-        img_path = self.files[idx]
-        image = Image.open(img_path).convert('RGB')
-        if self.transform:
-            image = self.transform(image)
-
-        label = self.labels[idx]
-        return image, label
 
 def load_saved_model(model_path, device):
     model_fullname = model_path.split(os.sep)[-1]
@@ -100,7 +70,7 @@ def save_results(results, save_dir):
     os.makedirs(save_dir, exist_ok=True)
     df = pd.DataFrame(results)
 
-    csv_path = os.path.join(save_dir, "trash.csv")
+    csv_path = os.path.join(save_dir, "results.csv")
     df.to_csv(csv_path, mode='a', index=False, header=not os.path.exists(csv_path))
     print(f"Metrics DONE!!!")
 
@@ -109,17 +79,9 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     data_dir = os.getenv('DATA_PATH')
-    gan_dir = os.path.join(data_dir, 'test', 'ai', 'style_gan2')
-    real_dir = os.path.join(data_dir, 'test', 'real')
     save_dir = os.getenv('SAVE_PATH')
 
-    #_, _, test_loader = get_data_loader(data_dir, batch=32)
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor()
-    ])
-    gan_dataset = GANImageDataset(gan_dir, real_dir, transform=transform)
-    test_loader = DataLoader(gan_dataset, batch_size=32, shuffle=False)
+    _, _, test_loader = get_data_loader(data_dir, batch=32)
 
     models = [f for f in os.listdir(save_dir) if f.endswith('.pth')]
     results = []

@@ -58,7 +58,7 @@ dataset/
 ---
 
 ## How to run?
-
+z5dyppmvty@privaterelay.appleid.com
 ```bash
 # 환경 변수 설정
 export DATA_PATH=/path/to/dataset
