@@ -11,18 +11,8 @@ venv/
 .env/
 .envrc
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
 # PyCharm
 .idea/
-
-# VSCode
-.vscode/
-
-# OS 별 임시 파일
-.DS_Store
-Thumbs.db
 
 # Log / Cache / Output
 *.log
@@ -32,19 +22,13 @@ Thumbs.db
 
 # Data
 *.csv
-*.tsv
-*.h5
-*.npy
-*.npz
 
 # Model weights
-*.pt
 *.pth
-*.onnx
-*.hdf5
 
 # Images
-*.jpg
-*.jpeg
 *.png
-*.gif
+
+stylegan2-ada-pytorch-main/
+ai_heatmap/
+real_heatmap/

@@ -8,41 +8,41 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-base_dir = os.getenv("DATA_PATH")
-classes = ["elephant", "cat", "chicken", "cow", "dog", "horse", "rabbit", "sheep"]
-num_images_per_class = 1000
+device = "cpu" #"cuda" if torch.cuda.is_available() else "cpu"
+base_dir = os.getenv("OLD_DATA_PATH")
+classes = ["dog"] #["elephant", "cat", "chicken", "cow", "dog", "horse", "rabbit", "sheep"]
+num_images_per_class = 5
 size = (224, 224)
-split_ratios = {"train": 0.7, "val": 0.15, "test": 0.15}
+split_ratios = {"train": 0, "val": 0, "test": 1}
 
 print("Loading Stable Diffusion utils...")
 
-#sd15 = StableDiffusionPipeline.from_pretrained(
-#    "runwayml/stable-diffusion-v1-5",
-#    dtype=torch.float16,
-#    variant="fp16"
-#).to(device)
+sd15 = StableDiffusionPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5",
+    dtype=torch.float16,
+    variant="fp16"
+).to(device)
 
 #sdxl = StableDiffusionXLPipeline.from_pretrained(
 #    "stabilityai/stable-diffusion-xl-base-1.0",
 #    dtype=torch.float16
 #).to(device)
 
-turbo = StableDiffusionPipeline.from_pretrained(
-    "stabilityai/sd-turbo",
-    dtype=torch.float16,
-    variant="fp16"
-).to(device)
+#turbo = StableDiffusionPipeline.from_pretrained(
+#    "stabilityai/sd-turbo",
+#    dtype=torch.float16,
+#    variant="fp16"
+#).to(device)
 
 print("Models loaded successfully.")
 
 generators = {
-    #"stable_v15": sd15,
+    "stable_v15": sd15,
     #"sdxl": sdxl,
-    "sd_turbo": turbo
+    #"sd_turbo": turbo
 }
 
-temp_dir = os.path.join(base_dir, "temp_ai_images")
+temp_dir = os.path.join(base_dir, "temp")
 
 for generator_name, pipe in generators.items():
     print(f"Generating images with {generator_name} ...")
@@ -51,13 +51,13 @@ for generator_name, pipe in generators.items():
         os.makedirs(temp_save_dir, exist_ok=True)
         for i in tqdm(range(num_images_per_class), desc=f"{generator_name}-{cls}"):
             prompt = f"photo of a {cls}, high quality, natural lighting"
-            image = pipe(prompt, num_inference_steps=4).images[0] #sd15 = 30 steps, sd turbo = 4 steps
+            image = pipe(prompt, num_inference_steps=30).images[0] #sd15 = 30 steps, sd turbo = 4 steps
             image = image.resize(size)
-            image.save(os.path.join(temp_save_dir, f"{cls}_{i+1000:04d}.png"))
+            image.save(os.path.join(temp_save_dir, f"{cls}_{i:04d}.png"))
 
 print("\nSplitting generated images into train, val, and test sets...")
 
-for generator_name in generators.keys():
+'''for generator_name in generators.keys():
     for cls in classes:
         temp_class_dir = os.path.join(temp_dir, generator_name, cls)
         images = [f for f in os.listdir(temp_class_dir) if f.endswith('.png')]
@@ -74,7 +74,7 @@ for generator_name in generators.keys():
                 src_path = os.path.join(temp_class_dir, file_name)
                 dest_path = os.path.join(dest_dir, file_name)
                 shutil.move(src_path, dest_path)
-
+'''
 print("\nCleaning up temporary files...")
-shutil.rmtree(temp_dir)
+#shutil.rmtree(temp_dir)
 print("\nAll tasks are complete! Dataset is ready.")

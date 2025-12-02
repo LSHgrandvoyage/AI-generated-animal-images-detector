@@ -70,8 +70,6 @@ dataset/
 
 ---
 
-# 🚀 How to Run Training
-
 ```bash
 export DATA_PATH=/path/to/dataset
 export SAVE_PATH=/path/to/save_dir
